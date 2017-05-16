@@ -47,14 +47,16 @@ class AutoEncoder:
                     x_tmp = tf.image.flip_left_right(x_tmp)
                     t_tmp = tf.image.flip_left_right(t_tmp)
 
-                rint = random.randint(0, 2)
-                if rint%2 != 0:
+                rint = random.randint(0, 4)
+                # Some images has meaning in vertical direction,
+                # so images are flipped vertically in lower probability than horizontal flipping
+                if rint%4 == 0:
                     x_tmp = tf.image.flip_up_down(x_tmp)
                     t_tmp = tf.image.flip_up_down(t_tmp)
 
                 rint = random.randint(0, 4)
                 # Some images has meaning in vertical direction,
-                # so images are transposed in lower probability than left right flipping
+                # so images are transposed in lower probability than horizontal flipping
                 if rint%4 == 0:
                     x_tmp = tf.image.transpose_image(x_tmp)
                     t_tmp = tf.image.transpose_image(t_tmp)
