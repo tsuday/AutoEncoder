@@ -62,7 +62,7 @@ with nn.sess as sess:
             #image_data = scaler.fit_transform(image_data)
             depth_data = depth_data.reshape((AutoEncoder.batch_size, AutoEncoder.nPixels))
             
-            nn.sess.run([nn.train_step], feed_dict={nn.x:image_data, nn.t:depth_data})
+            nn.sess.run([nn.train_step], feed_dict={nn.x:image_data, nn.t:depth_data, nn.keep_prob:0.5})
             if i == n_all_loop:
                 coord.request_stop()
 
@@ -70,7 +70,7 @@ with nn.sess as sess:
             if i==start+1 or i % n_report_loss_loop == 0:
                 loss_vals = []
                 loss_val, t_cmp, out, summary, x_input = nn.sess.run([nn.loss, nn.t_compare, nn.output, nn.summary, nn.x_image],
-                                                            feed_dict={nn.x:image_data, nn.t:depth_data})
+                                                            feed_dict={nn.x:image_data, nn.t:depth_data, nn.keep_prob:1.0})
                 loss_vals.append(loss_val)
                 loss_val = np.sum(loss_vals)
                 nn.saver.save(nn.sess, './saved_session/s', global_step=i)

@@ -33,7 +33,11 @@ class AutoEncoder:
 
             t = tf.placeholder(tf.float32, [None, AutoEncoder.nPixels])
             t_image = tf.reshape(t, [AutoEncoder.batch_size, AutoEncoder.nWidth, AutoEncoder.nHeight, 1])
-            
+
+            # keep probabilities for dropout layer
+            keep_prob = tf.placeholder(tf.float32)
+            keep_all = tf.constant(1.0, dtype=tf.float32)
+
             ## Data Augmentation
             x_tmp_array = []
             t_tmp_array = []
@@ -142,18 +146,18 @@ class AutoEncoder:
                 layers.append(output)
 
         decode_output_channels = [
-            #(out_channels_base * 8, 0.5), # decoder_9: [batch_size, 1, 1, out_channels_base * 8] => [batch_size, 2, 2, out_channels_base * 8 * 2]
-            (out_channels_base * 8, 0.5),  # decoder_8: [batch_size, 2, 2, out_channels_base * 8 * 2] => [batch_size, 4, 4, out_channels_base * 8 * 2]
-            (out_channels_base * 8, 0.5),  # decoder_7: [batch_size, 4, 4, out_channels_base * 8 * 2] => [batch_size, 8, 8, out_channels_base * 8 * 2]
-            (out_channels_base * 8, 0.0),  # decoder_6: [batch_size, 8, 8, out_channels_base * 8 * 2] => [batch_size, 16, 16, out_channels_base * 8 * 2]
-            (out_channels_base * 8, 0.0),  # decoder_5: [batch_size, 16, 16, out_channels_base * 8 * 2] => [batch_size, 32, 32, out_channels_base * 4 * 2]
-            (out_channels_base * 4, 0.0),  # decoder_4: [batch_size, 32, 32, out_channels_base * 4 * 2] => [batch_size, 64, 64, out_channels_base * 2 * 2]
-            (out_channels_base * 2, 0.0),  # decoder_3: [batch_size, 64, 64, out_channels_base * 4 * 2] => [batch_size, 128, 128, out_channels_base * 2 * 2]
-            (out_channels_base, 0.0),      # decoder_2: [batch_size, 128, 128, out_channels_base * 2 * 2] => [batch_size, 256, 256, out_channels_base * 2]
+            #(out_channels_base * 8, keep_prob), # decoder_9: [batch_size, 1, 1, out_channels_base * 8] => [batch_size, 2, 2, out_channels_base * 8 * 2]
+            (out_channels_base * 8, keep_prob),  # decoder_8: [batch_size, 2, 2, out_channels_base * 8 * 2] => [batch_size, 4, 4, out_channels_base * 8 * 2]
+            (out_channels_base * 8, keep_prob),  # decoder_7: [batch_size, 4, 4, out_channels_base * 8 * 2] => [batch_size, 8, 8, out_channels_base * 8 * 2]
+            (out_channels_base * 8, keep_all),  # decoder_6: [batch_size, 8, 8, out_channels_base * 8 * 2] => [batch_size, 16, 16, out_channels_base * 8 * 2]
+            (out_channels_base * 8, keep_all),  # decoder_5: [batch_size, 16, 16, out_channels_base * 8 * 2] => [batch_size, 32, 32, out_channels_base * 4 * 2]
+            (out_channels_base * 4, keep_all),  # decoder_4: [batch_size, 32, 32, out_channels_base * 4 * 2] => [batch_size, 64, 64, out_channels_base * 2 * 2]
+            (out_channels_base * 2, keep_all),  # decoder_3: [batch_size, 64, 64, out_channels_base * 4 * 2] => [batch_size, 128, 128, out_channels_base * 2 * 2]
+            (out_channels_base    , keep_all),      # decoder_2: [batch_size, 128, 128, out_channels_base * 2 * 2] => [batch_size, 256, 256, out_channels_base * 2]
         ]
         
         num_encoder_layers = len(layers)
-        for decoder_layer, (out_channels, dropout) in enumerate(decode_output_channels):
+        for decoder_layer, (out_channels, dropout_keep_prob) in enumerate(decode_output_channels):
             skip_layer = num_encoder_layers - decoder_layer - 1
             with tf.variable_scope("decoder_%d" % (skip_layer + 1)):
                 if decoder_layer == 0:
@@ -169,8 +173,8 @@ class AutoEncoder:
                 output = decode(rectified, out_channels)
                 output = batchnorm(output)
 
-                if dropout > 0.0:
-                    output = tf.nn.dropout(output, keep_prob=1 - dropout)
+                # dropout layer
+                output = tf.cond(dropout_keep_prob < 1.0, lambda: tf.nn.dropout(output, keep_prob=dropout_keep_prob), lambda: output)
 
                 layers.append(output)
 
@@ -199,6 +203,7 @@ class AutoEncoder:
         
         self.x = x
         self.t = t
+        self.keep_prob = keep_prob
         self.train_step = train_step
         self.output = output
         self.t_compare = t_compare
