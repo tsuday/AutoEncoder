@@ -20,11 +20,11 @@ class AutoEncoder:
     outputWidth = nWidth
     outputHeight = nHeight
 
-    def __init__(self):
+    def __init__(self, training_csv_file_name):
         with tf.Graph().as_default():
             self.prepare_model()
             self.prepare_session()
-            self.prepare_batch()
+            self.prepare_batch(training_csv_file_name)
 
     def prepare_model(self):
         with tf.name_scope("input"):
@@ -248,8 +248,8 @@ class AutoEncoder:
             min_after_dequeue=min_after_dequeue)
         return example_batch, label_batch
 
-    def prepare_batch(self):
-        image_batch, depth_batch = self.input_pipeline(['dataList.csv'], AutoEncoder.batch_size, AutoEncoder.read_threads)
+    def prepare_batch(self, training_csv_file_name):
+        image_batch, depth_batch = self.input_pipeline([training_csv_file_name], AutoEncoder.batch_size, AutoEncoder.read_threads)
         
         self.image_batch = image_batch
         self.depth_batch = depth_batch
