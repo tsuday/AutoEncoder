@@ -15,12 +15,13 @@ class AutoEncoder:
     nWidth = 512
     nHeight = 512
     nPixels = nWidth * nHeight
-    batch_size = 8
     read_threads = 1
     outputWidth = nWidth
     outputHeight = nHeight
 
-    def __init__(self, training_csv_file_name):
+    def __init__(self, training_csv_file_name, batch_size):
+        self.batch_size = batch_size
+        
         with tf.Graph().as_default():
             self.prepare_model()
             self.prepare_session()
@@ -29,10 +30,10 @@ class AutoEncoder:
     def prepare_model(self):
         with tf.name_scope("input"):
             x = tf.placeholder(tf.float32, [None, AutoEncoder.nPixels])
-            x_image = tf.cast(tf.reshape(x, [AutoEncoder.batch_size, AutoEncoder.nWidth, AutoEncoder.nHeight, 1]), tf.float32)
+            x_image = tf.cast(tf.reshape(x, [self.batch_size, AutoEncoder.nWidth, AutoEncoder.nHeight, 1]), tf.float32)
 
             t = tf.placeholder(tf.float32, [None, AutoEncoder.nPixels])
-            t_image = tf.reshape(t, [AutoEncoder.batch_size, AutoEncoder.nWidth, AutoEncoder.nHeight, 1])
+            t_image = tf.reshape(t, [self.batch_size, AutoEncoder.nWidth, AutoEncoder.nHeight, 1])
 
             # keep probabilities for dropout layer
             keep_prob = tf.placeholder(tf.float32)
@@ -41,7 +42,7 @@ class AutoEncoder:
             ## Data Augmentation
             x_tmp_array = []
             t_tmp_array = []
-            for i in range(AutoEncoder.batch_size):
+            for i in range(self.batch_size):
                 x_tmp = x_image[i, :, :, :]
                 t_tmp = t_image[i, :, :, :]
 
@@ -249,7 +250,7 @@ class AutoEncoder:
         return example_batch, label_batch
 
     def prepare_batch(self, training_csv_file_name):
-        image_batch, depth_batch = self.input_pipeline([training_csv_file_name], AutoEncoder.batch_size, AutoEncoder.read_threads)
+        image_batch, depth_batch = self.input_pipeline([training_csv_file_name], self.batch_size, AutoEncoder.read_threads)
         
         self.image_batch = image_batch
         self.depth_batch = depth_batch
