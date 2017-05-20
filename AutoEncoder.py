@@ -19,8 +19,9 @@ class AutoEncoder:
     outputWidth = nWidth
     outputHeight = nHeight
 
-    def __init__(self, training_csv_file_name, batch_size):
+    def __init__(self, training_csv_file_name, batch_size, b_data_augmentation):
         self.batch_size = batch_size
+        self.b_data_augmentation = b_data_augmentation
         
         with tf.Graph().as_default():
             self.prepare_model()
@@ -40,37 +41,38 @@ class AutoEncoder:
             keep_all = tf.constant(1.0, dtype=tf.float32)
 
             ## Data Augmentation
-            x_tmp_array = []
-            t_tmp_array = []
-            for i in range(self.batch_size):
-                x_tmp = x_image[i, :, :, :]
-                t_tmp = t_image[i, :, :, :]
+            if self.b_data_augmentation:
+                x_tmp_array = []
+                t_tmp_array = []
+                for i in range(self.batch_size):
+                    x_tmp = x_image[i, :, :, :]
+                    t_tmp = t_image[i, :, :, :]
 
-                # flip each images left right and up down randomly
-                rint = random.randint(0, 2)
-                if rint%2 != 0:
-                    x_tmp = tf.image.flip_left_right(x_tmp)
-                    t_tmp = tf.image.flip_left_right(t_tmp)
+                    # flip each images left right and up down randomly
+                    rint = random.randint(0, 2)
+                    if rint%2 != 0:
+                        x_tmp = tf.image.flip_left_right(x_tmp)
+                        t_tmp = tf.image.flip_left_right(t_tmp)
 
-                rint = random.randint(0, 4)
-                # Some images has meaning in vertical direction,
-                # so images are flipped vertically in lower probability than horizontal flipping
-                if rint%4 == 0:
-                    x_tmp = tf.image.flip_up_down(x_tmp)
-                    t_tmp = tf.image.flip_up_down(t_tmp)
+                    rint = random.randint(0, 4)
+                    # Some images has meaning in vertical direction,
+                    # so images are flipped vertically in lower probability than horizontal flipping
+                    if rint%4 == 0:
+                        x_tmp = tf.image.flip_up_down(x_tmp)
+                        t_tmp = tf.image.flip_up_down(t_tmp)
 
-                rint = random.randint(0, 4)
-                # Some images has meaning in vertical direction,
-                # so images are transposed in lower probability than horizontal flipping
-                if rint%4 == 0:
-                    x_tmp = tf.image.transpose_image(x_tmp)
-                    t_tmp = tf.image.transpose_image(t_tmp)
+                    rint = random.randint(0, 4)
+                    # Some images has meaning in vertical direction,
+                    # so images are transposed in lower probability than horizontal flipping
+                    if rint%4 == 0:
+                        x_tmp = tf.image.transpose_image(x_tmp)
+                        t_tmp = tf.image.transpose_image(t_tmp)
 
-                x_tmp_array.append(tf.expand_dims(x_tmp, 0))
-                t_tmp_array.append(tf.expand_dims(t_tmp, 0))
+                    x_tmp_array.append(tf.expand_dims(x_tmp, 0))
+                    t_tmp_array.append(tf.expand_dims(t_tmp, 0))
 
-            x_image = tf.concat(x_tmp_array, axis=0)
-            t_image = tf.concat(t_tmp_array, axis=0)
+                x_image = tf.concat(x_tmp_array, axis=0)
+                t_image = tf.concat(t_tmp_array, axis=0)
             
             self.x_image = x_image
 

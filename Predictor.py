@@ -20,7 +20,7 @@ def draw_image(image_list, caption_list, batch_size, width, height):
             # image_list[j] is each images with 4-D(first dimension is batch_size)
             subplot.imshow(image_list[j][i], vmin=0, vmax=255, cmap=plt.cm.gray, interpolation="nearest")
 
-nn = AutoEncoder("predictList.csv", 1)
+nn = AutoEncoder("predictList.csv", 1, False)
 coord = tf.train.Coordinator()
 threads = tf.train.start_queue_runners(coord=coord, sess=nn.sess)
 
