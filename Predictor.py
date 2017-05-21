@@ -20,23 +20,23 @@ def draw_image(image_list, caption_list, batch_size, width, height):
             # image_list[j] is each images with 4-D(first dimension is batch_size)
             subplot.imshow(image_list[j][i], vmin=0, vmax=255, cmap=plt.cm.gray, interpolation="nearest")
 
-nn = AutoEncoder("predictList.csv", 1, False)
+ae = AutoEncoder("predictList.csv", 1, False)
 coord = tf.train.Coordinator()
-threads = tf.train.start_queue_runners(coord=coord, sess=nn.sess)
+threads = tf.train.start_queue_runners(coord=coord, sess=ae.sess)
 
-with nn.sess as sess:
-    nn.saver.restore(sess, "./saved_session/s-36000")
+with ae.sess as sess:
+    ae.saver.restore(sess, "./saved_session/s-36000")
     
     try:
         while not coord.should_stop():
-            image_in_csv, depth_data = nn.sess.run([nn.image_batch, nn.depth_batch])
-            image_in_csv = image_in_csv.reshape((nn.batch_size, AutoEncoder.nPixels))
+            image_in_csv, depth_data = ae.sess.run([ae.image_batch, ae.depth_batch])
+            image_in_csv = image_in_csv.reshape((ae.batch_size, AutoEncoder.nPixels))
 
-            out, x_input = nn.sess.run([nn.output, nn.x_image], feed_dict={nn.x:image_in_csv, nn.keep_prob:1.0})
+            out, x_input = ae.sess.run([ae.output, ae.x_image], feed_dict={ae.x:image_in_csv, ae.keep_prob:1.0})
 
             draw_image([x_input, out],
                        ["Input Image", "Output Image"],
-                       nn.batch_size, nn.outputWidth, nn.outputHeight)
+                       ae.batch_size, ae.outputWidth, ae.outputHeight)
             coord.request_stop()
 
     except tf.errors.OutOfRangeError:
@@ -49,6 +49,6 @@ with nn.sess as sess:
     coord.request_stop()
     coord.join(threads)
 
-nn.sess.close()
+ae.sess.close()
 
 print("Predictor End")

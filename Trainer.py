@@ -1,4 +1,4 @@
-## Executor for AutoEncoder learning
+## Trainer for AutoEncoder learning
 
 import tensorflow as tf
 import numpy as np
@@ -25,9 +25,9 @@ def draw_image(image_list, caption_list, batch_size, width, height):
             # image_list[j] is each images with 4-D(first dimension is batch_size)
             subplot.imshow(image_list[j][i], vmin=0, vmax=255, cmap=plt.cm.gray, interpolation="nearest")
 
-nn = AutoEncoder('dataList.csv', 8, true)
+ae = AutoEncoder('dataList.csv', 8, true)
 coord = tf.train.Coordinator()
-threads = tf.train.start_queue_runners(coord=coord, sess=nn.sess)
+threads = tf.train.start_queue_runners(coord=coord, sess=ae.sess)
 scaler = MinMaxScaler(feature_range=(0,1))
 
 # If you want to resume learning, please set start step number larger than 0
@@ -47,42 +47,42 @@ n_all_loop = 2000000
 
 
 print("Start Learning loop")
-with nn.sess as sess:
+with ae.sess as sess:
     
     if start > 0:
         print("Resume from session files")
-        nn.saver.restore(sess, "./saved_session/s-" +str(start))
+        ae.saver.restore(sess, "./saved_session/s-" +str(start))
     
     try:
         while not coord.should_stop():
             i += 1
             # Run training steps or whatever
-            image_data, depth_data = nn.sess.run([nn.image_batch, nn.depth_batch])
-            image_data = image_data.reshape((nn.batch_size, AutoEncoder.nPixels))
+            image_data, depth_data = ae.sess.run([ae.image_batch, ae.depth_batch])
+            image_data = image_data.reshape((ae.batch_size, AutoEncoder.nPixels))
             #image_data = scaler.fit_transform(image_data)
-            depth_data = depth_data.reshape((nn.batch_size, AutoEncoder.nPixels))
+            depth_data = depth_data.reshape((ae.batch_size, AutoEncoder.nPixels))
             
-            nn.sess.run([nn.train_step], feed_dict={nn.x:image_data, nn.t:depth_data, nn.keep_prob:0.5})
+            ae.sess.run([ae.train_step], feed_dict={ae.x:image_data, ae.t:depth_data, ae.keep_prob:0.5})
             if i == n_all_loop:
                 coord.request_stop()
 
             #TODO:Split data into groups for cross-validation
             if i==start+1 or i % n_report_loss_loop == 0:
                 loss_vals = []
-                loss_val, t_cmp, out, summary, x_input = nn.sess.run([nn.loss, nn.t_compare, nn.output, nn.summary, nn.x_image],
-                                                            feed_dict={nn.x:image_data, nn.t:depth_data, nn.keep_prob:1.0})
+                loss_val, t_cmp, out, summary, x_input = ae.sess.run([ae.loss, ae.t_compare, ae.output, ae.summary, ae.x_image],
+                                                            feed_dict={ae.x:image_data, ae.t:depth_data, ae.keep_prob:1.0})
                 loss_vals.append(loss_val)
                 loss_val = np.sum(loss_vals)
-                nn.saver.save(nn.sess, './saved_session/s', global_step=i)
+                ae.saver.save(ae.sess, './saved_session/s', global_step=i)
                 print ('Step: %d, Loss: %f @ %s' % (i, loss_val, datetime.now().strftime("%Y/%m/%d %H:%M:%S")))
                 if i==start+1 or i % n_report_image_loop == 0:
-                    x_input = tf.reshape(x_input, [nn.batch_size, nn.outputWidth, nn.outputHeight])
-                    t_cmp = tf.reshape(t_cmp, [nn.batch_size, nn.outputWidth, nn.outputHeight])
-                    out = tf.reshape(out, [nn.batch_size, nn.outputWidth, nn.outputHeight])
-                    draw_image([x_input.eval(session=nn.sess), out.eval(session=nn.sess), t_cmp.eval(session=nn.sess)],
+                    x_input = tf.reshape(x_input, [ae.batch_size, ae.outputWidth, ae.outputHeight])
+                    t_cmp = tf.reshape(t_cmp, [ae.batch_size, ae.outputWidth, ae.outputHeight])
+                    out = tf.reshape(out, [ae.batch_size, ae.outputWidth, ae.outputHeight])
+                    draw_image([x_input.eval(session=ae.sess), out.eval(session=ae.sess), t_cmp.eval(session=ae.sess)],
                                ["Input Image", "Predicted Result", "Ground Truth"],
-                               nn.batch_size, nn.outputWidth, nn.outputHeight)
-                    nn.writer.add_summary(summary, i)
+                               ae.batch_size, ae.outputWidth, ae.outputHeight)
+                    ae.writer.add_summary(summary, i)
 
     except tf.errors.OutOfRangeError:
         print('Done training')
@@ -95,6 +95,6 @@ with nn.sess as sess:
     coord.request_stop()
     coord.join(threads)
 
-nn.sess.close()
+ae.sess.close()
 
 print("end")
