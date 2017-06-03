@@ -52,10 +52,17 @@ Default implementation of running parts write progress at the first step and eve
 _TODO:to be written_
 
 #### Tensor Board
-_TODO:to be written_
+_AutoEncoder.py_ outputs files for _Tensor Board_ in _board_ directory.  
+You can see _Tensor Board_ by _Tensorflow_'s usual way to invoke it.  
+
+_TODO:to be written for more details._
 
 #### Session file to resume learning
-_TODO:to be written_
+_Trainer.py_ saves files of session files, which includes trained parameters at the saving step.  
+These files are saved in _saved_session_ directory.
+
+_Trainer.py_ can load them to resume training from saved step.  
+_Predictor.py_ loads them to predict image by using trained parameters at saved step.  
 
 ## Trainer.py
 Sample implementation of training by using AutoEncoder.py.
