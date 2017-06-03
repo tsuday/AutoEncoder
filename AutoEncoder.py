@@ -77,16 +77,22 @@ class AutoEncoder:
             self.x_image = x_image
 
         # Encoding function for AutoEncoder
-        def encode(batch_input, out_channels, stride):
+        def encode(batch_input, out_channels, stride, filter_size):
             with tf.variable_scope("encode"):
                 in_channels = batch_input.get_shape()[3]
-                filter_size = 4
 
                 filter = tf.get_variable("filter", [filter_size, filter_size, in_channels, out_channels], dtype=tf.float32, initializer=tf.random_normal_initializer(0, 0.02))
                 # [batch, in_height, in_width, in_channels], [filter_width, filter_height, in_channels, out_channels]
                 #     => [batch, out_height, out_width, out_channels]
-                padded_input = tf.pad(batch_input, [[0, 0], [1, 1], [1, 1], [0, 0]], mode="CONSTANT")
-                conved = tf.nn.conv2d(padded_input, filter, [1, stride, stride, 1], padding="VALID")
+                
+                # padding if needed with the values of filter_size and stride to fit output size to out_channels
+                pad_size = int(filter_size - stride)
+                if pad_size > 0:
+                    pad0 = pad_size//2
+                    pad1 = pad_size//2 + pad_size%2
+                    batch_input = tf.pad(batch_input, [[0, 0], [pad0, pad1], [pad0, pad1], [0, 0]], mode="CONSTANT")
+
+                conved = tf.nn.conv2d(batch_input, filter, [1, stride, stride, 1], padding="VALID")
                 return conved
 
         # Leaky ReLU
@@ -110,9 +116,8 @@ class AutoEncoder:
                 return normalized
 
         # Decoding function for AutoEncoder
-        def decode(batch_input, out_channels):
+        def decode(batch_input, out_channels, filter_size):
             with tf.variable_scope("decode"):
-                filter_size = 4
                 batch, in_height, in_width, in_channels = [int(d) for d in batch_input.get_shape()]
                 filter = tf.get_variable("filter", [filter_size, filter_size, out_channels, in_channels], dtype=tf.float32, initializer=tf.random_normal_initializer(0, 0.02))
                 # [batch, in_height, in_width, in_channels], [filter_width, filter_height, out_channels, in_channels]
@@ -123,44 +128,47 @@ class AutoEncoder:
         # List to contain each layer of AutoEncoder
         layers = []
 
+        first_filter_size = 16
         out_channels_base = 32
         with tf.name_scope("encoder_1"):
             # encoder_1: [batch_size, 512, 512, out_channels_base] => [batch_size, 256, 256, out_channels_base * 2]
-            otpt = encode(x_image, out_channels_base, stride=2)
+            otpt = encode(x_image, out_channels_base, 2, first_filter_size)
             layers.append(otpt)
+            print(otpt)
 
         encode_output_channels = [
-            out_channels_base * 2,  # encoder_2: [batch_size, 256, 256, out_channels_base] => [batch_size, 128, 128, out_channels_base * 2]
-            out_channels_base * 4,  # encoder_3: [batch_size, 128, 128, out_channels_base] => [batch_size, 64, 64, out_channels_base * 2]
-            out_channels_base * 8,  # encoder_4: [batch_size, 64, 64, out_channels_base * 2] => [batch_size, 32, 32, out_channels_base * 4]
-            out_channels_base * 8,  # encoder_5: [batch_size, 32, 32, out_channels_base * 4] => [batch_size, 16, 16, out_channels_base * 8]
-            out_channels_base * 8,  # encoder_6: [batch_size, 16, 16, out_channels_base * 8] => [batch_size, 8, 8, out_channels_base * 8]
-            out_channels_base * 8,  # encoder_7: [batch_size, 8, 8, out_channels_base * 8] => [batch_size, 4, 4, out_channels_base * 8]
-            out_channels_base * 8,  # encoder_8: [batch_size, 4, 4, out_channels_base * 8] => [batch_size, 2, 2, out_channels_base * 8]
-            #out_channels_base * 8, # encoder_9: [batch_size, 2, 2, out_channels_base * 8] => [batch_size, 1, 1, out_channels_base * 8]
+            (out_channels_base * 2, 8),  # encoder_2: [batch_size, 256, 256, out_channels_base] => [batch_size, 128, 128, out_channels_base * 2]
+            (out_channels_base * 4, 4),  # encoder_3: [batch_size, 128, 128, out_channels_base] => [batch_size, 64, 64, out_channels_base * 2]
+            (out_channels_base * 8, 4),  # encoder_4: [batch_size, 64, 64, out_channels_base * 2] => [batch_size, 32, 32, out_channels_base * 4]
+            (out_channels_base * 8, 4),  # encoder_5: [batch_size, 32, 32, out_channels_base * 4] => [batch_size, 16, 16, out_channels_base * 8]
+            (out_channels_base * 8, 4),  # encoder_6: [batch_size, 16, 16, out_channels_base * 8] => [batch_size, 8, 8, out_channels_base * 8]
+            (out_channels_base * 8, 4),  # encoder_7: [batch_size, 8, 8, out_channels_base * 8] => [batch_size, 4, 4, out_channels_base * 8]
+            (out_channels_base * 8, 4),  # encoder_8: [batch_size, 4, 4, out_channels_base * 8] => [batch_size, 2, 2, out_channels_base * 8]
+            #(out_channels_base * 8, 2)   # encoder_9: [batch_size, 2, 2, out_channels_base * 8] => [batch_size, 1, 1, out_channels_base * 8]
         ]
 
-        for out_channels in encode_output_channels:
+        for encoder_layer, (out_channels, filter_size) in enumerate(encode_output_channels):
             with tf.variable_scope("encoder_%d" % (len(layers) + 1)):
                 rectified = lrelu(layers[-1], 0.2)
                 # [batch_size, height, width, in_channels] => [batch_size, height/2, width/2, out_channels]
-                encoded = encode(rectified, out_channels, stride=2)
+                encoded = encode(rectified, out_channels, 2, filter_size)
                 output = batchnorm(encoded)
                 layers.append(output)
+                print(output)
 
         decode_output_channels = [
-            #(out_channels_base * 8, keep_prob), # decoder_9: [batch_size, 1, 1, out_channels_base * 8] => [batch_size, 2, 2, out_channels_base * 8 * 2]
-            (out_channels_base * 8, keep_prob),  # decoder_8: [batch_size, 2, 2, out_channels_base * 8 * 2] => [batch_size, 4, 4, out_channels_base * 8 * 2]
-            (out_channels_base * 8, keep_prob),  # decoder_7: [batch_size, 4, 4, out_channels_base * 8 * 2] => [batch_size, 8, 8, out_channels_base * 8 * 2]
-            (out_channels_base * 8, keep_all),  # decoder_6: [batch_size, 8, 8, out_channels_base * 8 * 2] => [batch_size, 16, 16, out_channels_base * 8 * 2]
-            (out_channels_base * 8, keep_all),  # decoder_5: [batch_size, 16, 16, out_channels_base * 8 * 2] => [batch_size, 32, 32, out_channels_base * 4 * 2]
-            (out_channels_base * 4, keep_all),  # decoder_4: [batch_size, 32, 32, out_channels_base * 4 * 2] => [batch_size, 64, 64, out_channels_base * 2 * 2]
-            (out_channels_base * 2, keep_all),  # decoder_3: [batch_size, 64, 64, out_channels_base * 4 * 2] => [batch_size, 128, 128, out_channels_base * 2 * 2]
-            (out_channels_base    , keep_all),      # decoder_2: [batch_size, 128, 128, out_channels_base * 2 * 2] => [batch_size, 256, 256, out_channels_base * 2]
+            #(out_channels_base * 8, keep_prob, 2), # decoder_9: [batch_size, 1, 1, out_channels_base * 8] => [batch_size, 2, 2, out_channels_base * 8 * 2]
+            (out_channels_base * 8, keep_prob, 4),  # decoder_8: [batch_size, 2, 2, out_channels_base * 8 * 2] => [batch_size, 4, 4, out_channels_base * 8 * 2]
+            (out_channels_base * 8, keep_prob, 4),  # decoder_7: [batch_size, 4, 4, out_channels_base * 8 * 2] => [batch_size, 8, 8, out_channels_base * 8 * 2]
+            (out_channels_base * 8, keep_all, 4),  # decoder_6: [batch_size, 8, 8, out_channels_base * 8 * 2] => [batch_size, 16, 16, out_channels_base * 8 * 2]
+            (out_channels_base * 8, keep_all, 4),  # decoder_5: [batch_size, 16, 16, out_channels_base * 8 * 2] => [batch_size, 32, 32, out_channels_base * 4 * 2]
+            (out_channels_base * 4, keep_all, 4),  # decoder_4: [batch_size, 32, 32, out_channels_base * 4 * 2] => [batch_size, 64, 64, out_channels_base * 2 * 2]
+            (out_channels_base * 2, keep_all, 4),  # decoder_3: [batch_size, 64, 64, out_channels_base * 4 * 2] => [batch_size, 128, 128, out_channels_base * 2 * 2]
+            (out_channels_base    , keep_all, 8),      # decoder_2: [batch_size, 128, 128, out_channels_base * 2 * 2] => [batch_size, 256, 256, out_channels_base * 2]
         ]
         
         num_encoder_layers = len(layers)
-        for decoder_layer, (out_channels, dropout_keep_prob) in enumerate(decode_output_channels):
+        for decoder_layer, (out_channels, dropout_keep_prob, filter_size) in enumerate(decode_output_channels):
             skip_layer = num_encoder_layers - decoder_layer - 1
             with tf.variable_scope("decoder_%d" % (skip_layer + 1)):
                 if decoder_layer == 0:
@@ -173,26 +181,25 @@ class AutoEncoder:
                 rectified = tf.nn.relu(input)
                 
                 # [batch_size, height, width, in_channels] => [batch_size, height*2, width*2, out_channels]
-                output = decode(rectified, out_channels)
+                output = decode(rectified, out_channels, filter_size)
                 output = batchnorm(output)
 
                 # dropout layer
                 output = tf.cond(dropout_keep_prob < 1.0, lambda: tf.nn.dropout(output, keep_prob=dropout_keep_prob), lambda: output)
 
                 layers.append(output)
+                print(output)
 
         final_output_channels = 1 # 3 if used for color image
         # decoder_1: [batch, 256, 256, out_channels_base * 2] => [batch, 512, 512, final_output_channels]
         with tf.variable_scope("decoder_1"):
             input = tf.concat([layers[-1], layers[0]], axis=3)
             rectified = tf.nn.relu(input)
-            output = decode(rectified, final_output_channels)
+            output = decode(rectified, final_output_channels, first_filter_size)
             layers.append(output)
+            print(output)
 
         output = layers[-1]
-
-        for l in layers:
-            print(l)
 
         with tf.name_scope("Optimizer"):
             ## Define loss(difference between training data and predicted data), and criteria for learning algorithm.
