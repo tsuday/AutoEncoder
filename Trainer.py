@@ -2,7 +2,7 @@
 
 import tensorflow as tf
 import numpy as np
-%matplotlib inline
+#%matplotlib inline
 import matplotlib.pyplot as plt
 from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler
@@ -84,7 +84,7 @@ with ae.sess as sess:
                                ae.batch_size, ae.outputWidth, ae.outputHeight)
                     ae.writer.add_summary(summary, i)
 
-    except tf.errors.OutOfRangeError:
+    except tf.errors.OutOfRangeError as e:
         print('Done training')
         coord.request_stop(e)
     finally:
