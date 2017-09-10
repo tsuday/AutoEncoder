@@ -6,6 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler
+import os
+import sys
 
 print("start")
 
@@ -86,6 +88,10 @@ with ae.sess as sess:
 
     except tf.errors.OutOfRangeError as e:
         print('Done training')
+        coord.request_stop(e)
+    except Exception as e:
+        print('Caught exception')
+        print(sys.exc_info())
         coord.request_stop(e)
     finally:
         # When done, ask the threads to stop.
