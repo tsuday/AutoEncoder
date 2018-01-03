@@ -2,6 +2,8 @@ import tensorflow as tf
 import numpy as np
 import random
 
+import enum
+
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -18,12 +20,14 @@ class AutoEncoder:
     read_threads = 1
     outputWidth = nWidth
     outputHeight = nHeight
-
+    LossFunctions = enum.Enum("LossFunctions", "L1 L2")
+    
     def __init__(self, training_csv_file_name, batch_size, b_data_augmentation):
         self.batch_size = batch_size
         self.b_data_augmentation = b_data_augmentation
         # Option to skip conecctions between corresponding layers of encoder and decoder as in U-net
         self.is_skip_connection = True
+        self.loss_function = AutoEncoder.LossFunctions.L1
         
         with tf.Graph().as_default():
             self.prepare_model()
@@ -182,7 +186,6 @@ class AutoEncoder:
                         input = tf.concat([layers[-1], layers[skip_layer]], axis=3)
                     else:
                         input = layers[-1]
-                        
 
                 rectified = tf.nn.relu(input)
                 
@@ -208,10 +211,22 @@ class AutoEncoder:
         output = layers[-1]
 
         with tf.name_scope("Optimizer"):
-            ## Define loss(difference between training data and predicted data), and criteria for learning algorithm.
+            ## Define loss function (difference between training data and predicted data), and learning algorithm.
 
             t_compare = t_image
-            loss = tf.reduce_sum(tf.square(t_compare-output))
+
+            if self.loss_function is AutoEncoder.LossFunctions.L1:
+                # L1 distance
+                print("L1")
+                loss = tf.reduce_sum(tf.abs(t_compare-output))
+            elif self.loss_function is AutoEncoder.LossFunctions.L2:
+                # L2 distance
+                print("L2")
+                loss = tf.reduce_sum(tf.square(t_compare-output))
+            else:
+                # default: L1 distance
+                loss = tf.reduce_sum(tf.abs(t_compare-output))
+                
             train_step = tf.train.AdamOptimizer(0.0005).minimize(loss)
 
         tf.summary.scalar("loss", loss)
