@@ -22,6 +22,8 @@ class AutoEncoder:
     def __init__(self, training_csv_file_name, batch_size, b_data_augmentation):
         self.batch_size = batch_size
         self.b_data_augmentation = b_data_augmentation
+        # Option to skip conecctions between corresponding layers of encoder and decoder as in U-net
+        self.is_skip_connection = True
         
         with tf.Graph().as_default():
             self.prepare_model()
@@ -172,11 +174,15 @@ class AutoEncoder:
             skip_layer = num_encoder_layers - decoder_layer - 1
             with tf.variable_scope("decoder_%d" % (skip_layer + 1)):
                 if decoder_layer == 0:
-                    # Connected only from encode layer
+                    # Even if "skip connection", first layer in decode layers is connected only from encode layer
                     input = layers[-1]
                 else:
-                    # Also has skip connection from encoder layer
-                    input = tf.concat([layers[-1], layers[skip_layer]], axis=3)
+                    if self.is_skip_connection == True:
+                        # Concat output from encoder layer to keep detailed information
+                        input = tf.concat([layers[-1], layers[skip_layer]], axis=3)
+                    else:
+                        input = layers[-1]
+                        
 
                 rectified = tf.nn.relu(input)
                 
