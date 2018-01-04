@@ -22,12 +22,20 @@ class AutoEncoder:
     outputHeight = nHeight
     LossFunctions = enum.Enum("LossFunctions", "L1 L2")
     
-    def __init__(self, training_csv_file_name, batch_size, b_data_augmentation):
-        self.batch_size = batch_size
-        self.b_data_augmentation = b_data_augmentation
+    def __init__(self, training_csv_file_name, **options):
+        # options by argument
+        self.batch_size = options.get('batch_size', 1)
+        self.is_data_augmentation = options.get('is_data_augmentation', True)
         # Option to skip conecctions between corresponding layers of encoder and decoder as in U-net
-        self.is_skip_connection = True
+        self.is_skip_connection = options.get('is_skip_connection', True)
         self.loss_function = AutoEncoder.LossFunctions.L1
+        
+        isDebug = True
+        if isDebug:
+            print("batch_size : {0}".format(self.batch_size))
+            print("data_augmentation : {0}".format(self.is_data_augmentation))
+            print("skip_connection : {0}".format(self.is_skip_connection))
+            print("loss_function : {0}".format(self.loss_function))
         
         with tf.Graph().as_default():
             self.prepare_model()
@@ -47,7 +55,7 @@ class AutoEncoder:
             keep_all = tf.constant(1.0, dtype=tf.float32)
 
             ## Data Augmentation
-            if self.b_data_augmentation:
+            if self.is_data_augmentation:
                 x_tmp_array = []
                 t_tmp_array = []
                 for i in range(self.batch_size):
@@ -205,6 +213,9 @@ class AutoEncoder:
             input = tf.concat([layers[-1], layers[0]], axis=3)
             rectified = tf.nn.relu(input)
             output = decode(rectified, final_output_channels, first_filter_size)
+            
+            #output = tf.tanh(output)
+            
             layers.append(output)
             print(output)
 
