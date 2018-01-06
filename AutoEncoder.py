@@ -20,7 +20,16 @@ class AutoEncoder:
     read_threads = 1
     outputWidth = nWidth
     outputHeight = nHeight
-    LossFunctions = enum.Enum("LossFunctions", "L1 L2")
+    
+    # loss function with L1 distance
+    @staticmethod
+    def L1(output, target):
+        return tf.reduce_sum(tf.abs(target-output))
+    
+    # loss function with L2 distance
+    @staticmethod
+    def L2(output, target):
+        return tf.reduce_sum(tf.square(target-output))
     
     def __init__(self, training_csv_file_name, **options):
         # options by argument
@@ -28,7 +37,7 @@ class AutoEncoder:
         self.is_data_augmentation = options.get('is_data_augmentation', True)
         # Option to skip conecctions between corresponding layers of encoder and decoder as in U-net
         self.is_skip_connection = options.get('is_skip_connection', True)
-        self.loss_function = AutoEncoder.LossFunctions.L1
+        self.loss_function = options.get('loss_function', AutoEncoder.L1)
         
         isDebug = True
         if isDebug:
@@ -225,19 +234,7 @@ class AutoEncoder:
             ## Define loss function (difference between training data and predicted data), and learning algorithm.
 
             t_compare = t_image
-
-            if self.loss_function is AutoEncoder.LossFunctions.L1:
-                # L1 distance
-                print("L1")
-                loss = tf.reduce_sum(tf.abs(t_compare-output))
-            elif self.loss_function is AutoEncoder.LossFunctions.L2:
-                # L2 distance
-                print("L2")
-                loss = tf.reduce_sum(tf.square(t_compare-output))
-            else:
-                # default: L1 distance
-                loss = tf.reduce_sum(tf.abs(t_compare-output))
-                
+            loss = self.loss_function(output, t_compare)
             train_step = tf.train.AdamOptimizer(0.0005).minimize(loss)
 
         tf.summary.scalar("loss", loss)
