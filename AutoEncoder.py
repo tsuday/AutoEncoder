@@ -151,15 +151,11 @@ class AutoEncoder:
         # List to contain each layer of AutoEncoder
         layers = []
 
-        first_filter_size = 16
+        # 3 if used for color image
+        num_channels = 1
         out_channels_base = 32
-        with tf.name_scope("encoder_1"):
-            # encoder_1: [batch_size, 512, 512, out_channels_base] => [batch_size, 256, 256, out_channels_base * 2]
-            otpt = encode(x_image, out_channels_base, 2, first_filter_size)
-            layers.append(otpt)
-            print(otpt)
-
         encode_output_channels = [
+            (out_channels_base    , 16), # encoder_1: [batch_size, 512, 512, num_channels] => [batch_size, 256, 256, out_channels_base * 2]
             (out_channels_base * 2, 8),  # encoder_2: [batch_size, 256, 256, out_channels_base] => [batch_size, 128, 128, out_channels_base * 2]
             (out_channels_base * 4, 4),  # encoder_3: [batch_size, 128, 128, out_channels_base] => [batch_size, 64, 64, out_channels_base * 2]
             (out_channels_base * 8, 4),  # encoder_4: [batch_size, 64, 64, out_channels_base * 2] => [batch_size, 32, 32, out_channels_base * 4]
@@ -167,15 +163,18 @@ class AutoEncoder:
             (out_channels_base * 8, 4),  # encoder_6: [batch_size, 16, 16, out_channels_base * 8] => [batch_size, 8, 8, out_channels_base * 8]
             (out_channels_base * 8, 4),  # encoder_7: [batch_size, 8, 8, out_channels_base * 8] => [batch_size, 4, 4, out_channels_base * 8]
             (out_channels_base * 8, 4),  # encoder_8: [batch_size, 4, 4, out_channels_base * 8] => [batch_size, 2, 2, out_channels_base * 8]
-            #(out_channels_base * 8, 2)   # encoder_9: [batch_size, 2, 2, out_channels_base * 8] => [batch_size, 1, 1, out_channels_base * 8]
+            #(out_channels_base * 8, 2)  # encoder_9: [batch_size, 2, 2, out_channels_base * 8] => [batch_size, 1, 1, out_channels_base * 8]
         ]
 
-        for encoder_layer, (out_channels, filter_size) in enumerate(encode_output_channels):
+        for encoder_index, (out_channels, filter_size) in enumerate(encode_output_channels):
             with tf.variable_scope("encoder_%d" % (len(layers) + 1)):
-                rectified = lrelu(layers[-1], 0.2)
-                # [batch_size, height, width, in_channels] => [batch_size, height/2, width/2, out_channels]
-                encoded = encode(rectified, out_channels, 2, filter_size)
-                output = batchnorm(encoded)
+                if encoder_index == 0:
+                    output = encode(x_image, out_channels, 2, filter_size)
+                else:
+                    rectified = lrelu(layers[-1], 0.2)
+                    # [batch_size, height, width, in_channels] => [batch_size, height/2, width/2, out_channels]
+                    encoded = encode(rectified, out_channels, 2, filter_size)
+                    output = batchnorm(encoded)
                 layers.append(output)
                 print(output)
 
@@ -187,14 +186,15 @@ class AutoEncoder:
             (out_channels_base * 8, keep_all, 4),  # decoder_5: [batch_size, 16, 16, out_channels_base * 8 * 2] => [batch_size, 32, 32, out_channels_base * 4 * 2]
             (out_channels_base * 4, keep_all, 4),  # decoder_4: [batch_size, 32, 32, out_channels_base * 4 * 2] => [batch_size, 64, 64, out_channels_base * 2 * 2]
             (out_channels_base * 2, keep_all, 4),  # decoder_3: [batch_size, 64, 64, out_channels_base * 4 * 2] => [batch_size, 128, 128, out_channels_base * 2 * 2]
-            (out_channels_base    , keep_all, 8),      # decoder_2: [batch_size, 128, 128, out_channels_base * 2 * 2] => [batch_size, 256, 256, out_channels_base * 2]
+            (out_channels_base    , keep_all, 8),  # decoder_2: [batch_size, 128, 128, out_channels_base * 2 * 2] => [batch_size, 256, 256, out_channels_base * 2]
+            (num_channels         , keep_all, 16), # decoder_1: [batch, 256, 256, out_channels_base * 2] => [batch, 512, 512, num_channels]
         ]
         
         num_encoder_layers = len(layers)
-        for decoder_layer, (out_channels, dropout_keep_prob, filter_size) in enumerate(decode_output_channels):
-            skip_layer = num_encoder_layers - decoder_layer - 1
+        for decoder_index, (out_channels, dropout_keep_prob, filter_size) in enumerate(decode_output_channels):
+            skip_layer = num_encoder_layers - decoder_index - 1
             with tf.variable_scope("decoder_%d" % (skip_layer + 1)):
-                if decoder_layer == 0:
+                if decoder_index == 0:
                     # Even if "skip connection", first layer in decode layers is connected only from encode layer
                     input = layers[-1]
                 else:
@@ -208,7 +208,12 @@ class AutoEncoder:
                 
                 # [batch_size, height, width, in_channels] => [batch_size, height*2, width*2, out_channels]
                 output = decode(rectified, out_channels, filter_size)
-                output = batchnorm(output)
+
+                if decoder_index != num_encoder_layers-1:
+                    output = batchnorm(output)
+                #else:
+                    # final decoder
+                    #output = tf.tanh(output)
 
                 # dropout layer
                 output = tf.cond(dropout_keep_prob < 1.0, lambda: tf.nn.dropout(output, keep_prob=dropout_keep_prob), lambda: output)
@@ -216,23 +221,11 @@ class AutoEncoder:
                 layers.append(output)
                 print(output)
 
-        final_output_channels = 1 # 3 if used for color image
-        # decoder_1: [batch, 256, 256, out_channels_base * 2] => [batch, 512, 512, final_output_channels]
-        with tf.variable_scope("decoder_1"):
-            input = tf.concat([layers[-1], layers[0]], axis=3)
-            rectified = tf.nn.relu(input)
-            output = decode(rectified, final_output_channels, first_filter_size)
-            
-            #output = tf.tanh(output)
-            
-            layers.append(output)
-            print(output)
 
         output = layers[-1]
 
         with tf.name_scope("Optimizer"):
-            ## Define loss function (difference between training data and predicted data), and learning algorithm.
-
+            ## Apply loss function (difference between training data and predicted data), and learning algorithm.
             t_compare = t_image
             loss = self.loss_function(output, t_compare)
             train_step = tf.train.AdamOptimizer(0.0005).minimize(loss)
